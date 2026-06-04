@@ -26,6 +26,22 @@ function Dashboard() {
   const [nonOrganikBin, setNonOrganikBin] = useState({ percentage: 0, status: 'EMPTY' });
 
   // =====================================================
+  // FUNGSI AKURAT UNTUK MENENTUKAN STATUS
+  // =====================================================
+  const translateStatus = (statusMentah, percentage) => {
+    if (percentage !== undefined && percentage !== null) {
+      if (percentage >= 80) return 'FULL';
+      if (percentage >= 40) return 'HALF';
+      return 'EMPTY';
+    }
+    if (!statusMentah) return 'EMPTY';
+    const s = statusMentah.toUpperCase();
+    if (s === 'PENUH' || s === 'FULL') return 'FULL';
+    if (s === 'SETENGAH' || s === 'HALF') return 'HALF';
+    return 'EMPTY';
+  };
+
+  // =====================================================
   // FUNGSI UNTUK MENGAMBIL DATA DARI BACKEND FLASK
   // =====================================================
   const fetchData = useCallback(async () => {
@@ -68,22 +84,6 @@ function Dashboard() {
       console.log("Gagal mengambil data dari backend", error);
     }
   }, [userRole]);
-
-  // =====================================================
-  // FUNGSI AKURAT UNTUK MENENTUKAN STATUS
-  // =====================================================
-  const translateStatus = useCallback((statusMentah, percentage) => {
-    if (percentage !== undefined && percentage !== null) {
-      if (percentage >= 80) return 'FULL';
-      if (percentage >= 40) return 'HALF';
-      return 'EMPTY';
-    }
-    if (!statusMentah) return 'EMPTY';
-    const s = statusMentah.toUpperCase();
-    if (s === 'PENUH' || s === 'FULL') return 'FULL';
-    if (s === 'SETENGAH' || s === 'HALF') return 'HALF';
-    return 'EMPTY';
-  }, []);
 
   // =====================================================
   // AUTO REFRESH DATA SETIAP 3 DETIK (REAL-TIME POLLING)
