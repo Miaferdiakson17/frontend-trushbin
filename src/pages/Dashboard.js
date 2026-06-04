@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import apiService from '../api';
 
 /*
@@ -28,7 +28,7 @@ function Dashboard() {
   // =====================================================
   // FUNGSI UNTUK MENGAMBIL DATA DARI BACKEND FLASK
   // =====================================================
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const trashResponse = await apiService.getTrashData();
       const adminResponse = await apiService.getAdmins();
@@ -67,12 +67,12 @@ function Dashboard() {
     } catch (error) {
       console.log("Gagal mengambil data dari backend", error);
     }
-  };
+  }, [userRole]);
 
   // =====================================================
   // FUNGSI AKURAT UNTUK MENENTUKAN STATUS
   // =====================================================
-  const translateStatus = (statusMentah, percentage) => {
+  const translateStatus = useCallback((statusMentah, percentage) => {
     if (percentage !== undefined && percentage !== null) {
       if (percentage >= 80) return 'FULL';
       if (percentage >= 40) return 'HALF';
@@ -83,7 +83,7 @@ function Dashboard() {
     if (s === 'PENUH' || s === 'FULL') return 'FULL';
     if (s === 'SETENGAH' || s === 'HALF') return 'HALF';
     return 'EMPTY';
-  };
+  }, []);
 
   // =====================================================
   // AUTO REFRESH DATA SETIAP 3 DETIK (REAL-TIME POLLING)
@@ -92,7 +92,7 @@ function Dashboard() {
     fetchData();
     const interval = setInterval(fetchData, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData]);
 
   // =====================================================
   // FUNGSI WARNA REAL-TIME
