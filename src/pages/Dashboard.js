@@ -75,9 +75,8 @@ function Dashboard() {
 
       // Ambil data antrean register PENDING jika yang login adalah SUPER_ADMIN
       if (userRole === "SUPER_ADMIN") {
-        const response = await fetch('http://localhost:5000/api/pending-users');
-        const data = await response.json();
-        setPendingUsers(data || []);
+        const pendingResponse = await apiService.getPendingUsers();
+        setPendingUsers(pendingResponse.data || []);
       }
 
     } catch (error) {
@@ -111,13 +110,9 @@ function Dashboard() {
     if (!confirmAction) return;
 
     try {
-      const response = await fetch('http://localhost:5000/api/approve-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, action })
-      });
-
-      if (response.ok) {
+      const response = await apiService.approveUser(email, action);
+      
+      if (response.status === 200) {
         alert("Account has been approved successfully!");
         fetchData(); 
       } else {
@@ -141,19 +136,13 @@ function Dashboard() {
     if (!confirmDelete) return;
 
     try {
-      const response = await fetch('http://localhost:5000/api/delete-user', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
+      const response = await apiService.deleteUser(email);
 
-      const resData = await response.json();
-
-      if (response.ok) {
+      if (response.status === 200) {
         alert("Account deleted successfully!");
         fetchData(); 
       } else {
-        alert(resData.message || "Failed to delete account.");
+        alert(response.data?.message || "Failed to delete account.");
       }
     } catch (error) {
       console.error("Error during deletion:", error);
