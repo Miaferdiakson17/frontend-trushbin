@@ -41,6 +41,12 @@ const apiService = {
   deleteUser: (email) =>
     api.post("/delete-user", { email }),
 
+  // =======================================================
+  // PENTING: FUNGSI UPDATE PROFILE BARU YANG TADI HILANG
+  // =======================================================
+  updateProfile: (data) => 
+    api.put("/update-profile", data),
+
   // ========== BIN MANAGEMENT ==========
   resetBin: (binId) =>
     api.post("/reset", { bin_id: binId }),
