@@ -3,7 +3,7 @@ import apiService from '../api';
 
 /*
 =====================================================
-KELAS KOMPONEN HALAMAN DASHBOARD (TWO-OPTION APPROVAL & INTEGRATED HUB)
+KELAS KOMPONEN HALAMAN DASHBOARD (INTEGRATED MANAGEMENT HUB)
 =====================================================
 */
 function Dashboard() {
@@ -21,13 +21,13 @@ function Dashboard() {
   const currentEmail = localStorage.getItem("email_aktif") || ""; // Ambil email admin yang sedang login
 
   // =====================================================
-  // STATE EDIT PROFILE & SAKELAR VISIBILITAS FORM
+  // STATE KHUSUS SUPER ADMIN UTAMA (UNTUK EDIT ADMIN LAIN)
   // =====================================================
-  const [editName, setEditName] = useState(localStorage.getItem("nama_aktif") || "");
-  const [editEmail, setEditEmail] = useState(currentEmail);
+  const [selectedAdminEmail, setSelectedAdminEmail] = useState(null); // Menandai admin mana yang sedang diedit
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isEditingProfile, setIsEditingProfile] = useState(false); // Sakelar penampil form edit
 
   // =====================================================
   // STATE REALTIME TEMPAT SAMPAH (ESP32)
@@ -83,8 +83,8 @@ function Dashboard() {
         });
       }
 
-      // Ambil data antrean register PENDING jika yang login adalah SUPER_ADMIN
-      if (userRole === "SUPER_ADMIN") {
+      // Ambil data antrean register PENDING jika yang login adalah SUPER_ADMIN utama
+      if (userRole === "SUPER_ADMIN" || currentEmail === "julio@gmail.com") {
         const pendingResponse = await apiService.getPendingUsers();
         setPendingUsers(pendingResponse.data || []);
       }
@@ -92,7 +92,7 @@ function Dashboard() {
     } catch (error) {
       console.log("Gagal mengambil data dari backend", error);
     }
-  }, [userRole]);
+  }, [userRole, currentEmail]);
 
   // =====================================================
   // AUTO REFRESH DATA SETIAP 3 DETIK (REAL-TIME POLLING)
@@ -113,43 +113,44 @@ function Dashboard() {
   };
 
   // =====================================================
-  // FUNGSI UPDATE PROFILE INDIVIDU
+  // FUNGSI TRIGGER TOMBOL EDIT PADA KARTU ADMIN (OLEH SUPER ADMIN)
   // =====================================================
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    if (!currentEmail) {
-      alert("Session error. Please logout and login again.");
-      return;
-    }
+  const handleStartEdit = (admin) => {
+    setSelectedAdminEmail(admin.email);
+    setEditName(admin.name);
+    setEditEmail(admin.email);
+    setEditPassword(""); 
+  };
 
-    const confirmUpdate = window.confirm("Are you sure you want to update your profile data?");
+  // =====================================================
+  // FUNGSI SUBMIT EKSEKUSI PERUBAHAN DATA ADMIN OLEH SUPER ADMIN
+  // =====================================================
+  const handleUpdateAdminProfile = async (e) => {
+    e.preventDefault();
+    const confirmUpdate = window.confirm(`Are you sure you want to update credentials for ${selectedAdminEmail}?`);
     if (!confirmUpdate) return;
 
     setIsUpdating(true);
     try {
       const response = await apiService.updateProfile({
-        current_email: currentEmail,
+        current_email: currentEmail,        
+        target_email: selectedAdminEmail,   
         name: editName,
         new_email: editEmail,
-        password: editPassword || undefined // Kirim password hanya jika kolom diisi
+        password: editPassword || undefined 
       });
 
       if (response.status === 200) {
-        alert("Your profile has been updated successfully!");
-        
-        // Perbarui data penyimpanan lokal agar sinkron dengan UI Sidebar & Sesi
-        localStorage.setItem("nama_aktif", editName);
-        localStorage.setItem("email_aktif", editEmail);
-        
-        setEditPassword(""); // Kosongkan kembali form password setelah sukses
-        setIsEditingProfile(false); // Sembunyikan kembali form setelah sukses edit
-        fetchData();
+        alert("Admin credentials updated successfully!");
+        setSelectedAdminEmail(null); 
+        setEditPassword("");
+        fetchData(); 
       } else {
-        alert(response.data?.message || "Failed to update profile.");
+        alert(response.data?.message || "Failed to update admin data.");
       }
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert(error.response?.data?.message || "Network error. Failed to update profile.");
+      alert(error.response?.data?.message || "Authorization error or network failure.");
     } finally {
       setIsUpdating(false);
     }
@@ -256,7 +257,7 @@ function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#FFFFFF' }}></span>
             <span style={{ fontSize: '11px', color: '#FFFFFF', letterSpacing: '1.5px', fontWeight: '700', opacity: 0.9 }}>
-              {userRole === "SUPER_ADMIN" ? "HEAD OF DORM" : "SYSTEM CONTROL"}
+              {(userRole === "SUPER_ADMIN" || currentEmail === "julio@gmail.com") ? "HEAD OF DORM" : "SYSTEM CONTROL"}
             </span>
           </div>
         </div>
@@ -270,17 +271,22 @@ function Dashboard() {
             <span>📋</span> <span>Trash History Log</span>
           </button>
 
-          <button onClick={() => { setActiveMenu('admin'); setIsEditingProfile(false); }} className="menu-btn" style={{ display: 'flex', alignItems: 'center', gap: '15px', width: '100%', padding: '14px 20px', borderRadius: '14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '700', color: activeMenu === 'admin' ? '#00AA44' : '#FFFFFF', backgroundColor: activeMenu === 'admin' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.15)', boxShadow: activeMenu === 'admin' ? '0 8px 16px rgba(0, 0, 0, 0.08)' : 'none' }}>
-            <span>👥</span> 
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              System Controllers
-              {userRole === "SUPER_ADMIN" && pendingUsers.length > 0 && (
-                <span style={{ backgroundColor: '#FF3333', color: '#FFFFFF', padding: '2px 8px', borderRadius: '50%', fontSize: '11px', fontWeight: '800' }}>
-                  {pendingUsers.length}
-                </span>
-              )}
-            </span>
-          </button>
+          {/* ==================================================================== */}
+          {/* PERBAIKAN UTAMA: MENU INI DIHAPUS TOTAL JIKA LOGIN SEBAGAI ADMIN BIASA */}
+          {/* ==================================================================== */}
+          {(userRole === "SUPER_ADMIN" || currentEmail === "julio@gmail.com") && (
+            <button onClick={() => { setActiveMenu('admin'); setSelectedAdminEmail(null); }} className="menu-btn" style={{ display: 'flex', alignItems: 'center', gap: '15px', width: '100%', padding: '14px 20px', borderRadius: '14px', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: '700', color: activeMenu === 'admin' ? '#00AA44' : '#FFFFFF', backgroundColor: activeMenu === 'admin' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.15)', boxShadow: activeMenu === 'admin' ? '0 8px 16px rgba(0, 0, 0, 0.08)' : 'none' }}>
+              <span>👥</span> 
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                System Controllers
+                {pendingUsers.length > 0 && (
+                  <span style={{ backgroundColor: '#FF3333', color: '#FFFFFF', padding: '2px 8px', borderRadius: '50%', fontSize: '11px', fontWeight: '800' }}>
+                    {pendingUsers.length}
+                  </span>
+                )}
+              </span>
+            </button>
+          )}
         </div>
 
         <button onClick={handleLogout} style={{ marginTop: 'auto', zIndex: 2, width: 'calc(100% - 30px)', padding: '12px', border: '2px dashed rgba(255,255,255, 0.6)', borderRadius: '14px', backgroundColor: 'transparent', color: '#FFFFFF', fontWeight: '700', cursor: 'pointer' }}>
@@ -385,150 +391,113 @@ function Dashboard() {
           </div>
         )}
 
-        {/* ===================================================== */}
-        {/* VIEW 3: SYSTEM CONTROLLERS */}
-        {/* ===================================================== */}
-        {activeMenu === 'admin' && (
+        {/* VIEW 3: SYSTEM CONTROLLERS PANEL (HANYA MUNCUL JIKA OPERATOR ADALAH SUPER_ADMIN / JULIO) */}
+        {activeMenu === 'admin' && (userRole === "SUPER_ADMIN" || currentEmail === "julio@gmail.com") && (
           <div>
             
-            {/* SUB-PANEL 0: HEADER INTEGRASI AKUN AKTIF & TOMBOL TRIGGER EDIT PROFILE */}
-            <div style={{ marginBottom: '40px' }}>
-              <div style={{ backgroundColor: '#ffffff', padding: '24px 30px', borderRadius: '24px', boxShadow: '0 15px 40px rgba(0,0,0,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-                
-                {/* KIRI: INFORMASI UTAMA + RESUME IDENTITAS AKTIF (NAMA & EMAIL SEJAJAR) */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '30px', flexWrap: 'wrap' }}>
+            {/* FORM PENYUNTINGAN AKUN ADMIN OLEH SUPER ADMIN */}
+            {selectedAdminEmail && (
+              <div style={{ marginBottom: '40px', backgroundColor: '#ffffff', padding: '30px', borderRadius: '24px', boxShadow: '0 15px 40px rgba(0,0,0,0.04)', borderTop: '6px solid #00AA44', animation: 'fadeIn 0.3s' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div>
-                    <h2 style={{ fontSize: '22px', margin: '0 0 4px 0', color: '#004D26', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      ⚙️ Controller Account Settings
-                    </h2>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#6B8272', fontWeight: '500' }}>Update your profile identity details and security credentials securely.</p>
+                    <h3 style={{ fontSize: '20px', margin: 0, color: '#004D26', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: '700' }}>
+                      ✏️ Modify Registered Account Credentials
+                    </h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6B8272' }}>Target Account: <span style={{ fontWeight: '700', color: '#00AA44' }}>{selectedAdminEmail}</span></p>
                   </div>
-                  
-                  {/* DETAIL AKUN SEJAJAR DI SEBELAH KANAN TEXT UTAMA */}
-                  <div style={{ display: 'flex', gap: '25px', backgroundColor: '#F0FFF4', padding: '10px 20px', borderRadius: '14px', border: '1px solid #00E676' }}>
-                    <div>
-                      <span style={{ fontSize: '11px', color: '#556B5C', fontWeight: '700', letterSpacing: '0.5px' }}>NAME</span>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#004D26' }}>{localStorage.getItem("nama_aktif") || "julio"}</div>
-                    </div>
-                    <div style={{ borderLeft: '1px solid #C2E0C8' }}></div>
-                    <div>
-                      <span style={{ fontSize: '11px', color: '#556B5C', fontWeight: '700', letterSpacing: '0.5px' }}>EMAIL</span>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#004D26' }}>{currentEmail}</div>
-                    </div>
+                  <button onClick={() => setSelectedAdminEmail(null)} style={{ backgroundColor: '#6B8272', color: '#FFFFFF', border: 'none', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' }}>
+                    ❌ Cancel
+                  </button>
+                </div>
+
+                <form onSubmit={handleUpdateAdminProfile} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '500px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '14px', color: '#004D26' }}>Change Full Name</label>
+                    <input type="text" className="form-input" value={editName} onChange={(e) => setEditName(e.target.value)} required />
                   </div>
-                </div>
 
-                {/* KANAN: TOMBOL TOGGLE EDIT */}
-                <button 
-                  onClick={() => setIsEditingProfile(!isEditingProfile)} 
-                  style={{ backgroundColor: isEditingProfile ? '#6B8272' : '#00AA44', color: '#FFFFFF', border: 'none', padding: '12px 24px', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '14px', boxShadow: '0 4px 12px rgba(0, 170, 68, 0.15)', transition: 'all 0.2s' }}
-                >
-                  {isEditingProfile ? "❌ Close Form" : "✏️ Edit My Profile"}
-                </button>
-              </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '14px', color: '#004D26' }}>Change Email Address</label>
+                    <input type="email" className="form-input" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} required />
+                  </div>
 
-              {/* FORM PENYUNTINGAN AKAN EXPAND / COLLAPSE DI BAWAH HEADER */}
-              {isEditingProfile && (
-                <div style={{ backgroundColor: '#ffffff', padding: '30px', borderRadius: '24px', boxShadow: '0 15px 40px rgba(0,0,0,0.03)', marginTop: '20px', animation: 'fadeIn 0.3s' }}>
-                  <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '500px' }}>
-                    
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '14px', color: '#004D26' }}>Full Name</label>
-                      <input type="text" className="form-input" value={editName} onChange={(e) => setEditName(e.target.value)} required placeholder="Enter new name" />
-                    </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '14px', color: '#004D26' }}>Force New Password</label>
+                    <input type="password" className="form-input" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Type new security password" required />
+                  </div>
 
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '14px', color: '#004D26' }}>Email Address</label>
-                      <input type="email" className="form-input" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} required placeholder="Enter new email address" />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '14px', color: '#004D26' }}>New Password (Leave blank to keep unchanged)</label>
-                      <input type="password" className="form-input" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Enter new security password" />
-                    </div>
-
-                    <button type="submit" disabled={isUpdating} style={{ backgroundColor: '#00E676', color: '#FFFFFF', border: 'none', padding: '14px 24px', borderRadius: '12px', cursor: 'pointer', fontWeight: '800', fontSize: '15px', alignSelf: 'flex-start', boxShadow: '0 8px 20px rgba(0, 230, 118, 0.25)', opacity: isUpdating ? 0.7 : 1 }}>
-                      {isUpdating ? "⏳ Saving Changes..." : "💾 Save Changes & Update Profile"}
-                    </button>
-
-                  </form>
-                </div>
-              )}
-            </div>
-
-            {/* SUB-PANEL 1: DAFTAR AKUN BARU BERSTATUS PENDING (HANYA UNTUK SUPER_ADMIN) */}
-            {userRole === "SUPER_ADMIN" && (
-              <div style={{ marginBottom: '40px' }}>
-                <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#004D26', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: '700' }}>
-                  🔑 Pending Registration Requests
-                </h2>
-                <div style={{ backgroundColor: '#ffffff', padding: '30px', borderRadius: '24px', boxShadow: '0 15px 40px rgba(0,0,0,0.03)' }}>
-                  {pendingUsers.length === 0 ? (
-                    <p style={{ color: '#6B8272', margin: 0, fontWeight: '600' }}>🎉 No pending registration requests at the moment.</p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                      {pendingUsers.map((pUser, index) => (
-                        <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFDF0', padding: '16px 24px', borderRadius: '16px', border: '1px solid #FFD600' }}>
-                          <div>
-                            <div style={{ fontWeight: '700', color: '#004D26', fontSize: '16px' }}>{pUser.name}</div>
-                            <div style={{ fontSize: '13px', color: '#556B5C' }}>{pUser.email}</div>
-                          </div>
-                          
-                          <div style={{ display: 'flex', gap: '10px' }}>
-                            <button 
-                              onClick={() => handleApproval(pUser.email, 'APPROVED')} 
-                              style={{ backgroundColor: '#00E676', color: '#FFFFFF', border: 'none', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: '700' }}
-                            >
-                              ✅ Approve
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteUser(pUser.email, true)} 
-                              style={{ backgroundColor: '#FF3333', color: '#FFFFFF', border: 'none', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: '700' }}
-                            >
-                              🗑️ Delete
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  <button type="submit" disabled={isUpdating} style={{ backgroundColor: '#00E676', color: '#FFFFFF', border: 'none', padding: '14px 24px', borderRadius: '12px', cursor: 'pointer', fontWeight: '800', fontSize: '15px', alignSelf: 'flex-start', boxShadow: '0 8px 20px rgba(0, 230, 118, 0.25)', opacity: isUpdating ? 0.7 : 1 }}>
+                    {isUpdating ? "⏳ Overwriting Database..." : "💾 Overwrite & Update Account"}
+                  </button>
+                </form>
               </div>
             )}
 
-            {/* SUB-PANEL 2: DAFTAR AKUN ADMIN RESMI YANG AKTIF (HANYA UNTUK SUPER_ADMIN) */}
-            {userRole === "SUPER_ADMIN" && (
-              <div>
-                <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#004D26', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: '700' }}>
-                  👥 Active System Controllers (Admin List)
-                </h2>
-                <div style={{ backgroundColor: '#ffffff', padding: '30px', borderRadius: '24px', boxShadow: '0 15px 40px rgba(0,0,0,0.03)' }}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
-                    {adminData.map((admin, index) => (
-                      <div key={index} style={{ backgroundColor: '#F0FFF4', padding: '16px 24px', borderRadius: '18px', border: '2px solid #00E676', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: '320px', flex: '1 1 calc(33.333% - 20px)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ fontSize: '24px' }}>👤</span>
-                          <div>
-                            <div style={{ fontWeight: '700', color: '#004D26' }}>{admin.name}</div>
-                            <div style={{ fontSize: '13px', color: '#556B5C' }}>{admin.email}</div>
-                          </div>
+            {/* REQUEST REGISTER PENDING */}
+            <div style={{ marginBottom: '40px' }}>
+              <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#004D26', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: '700' }}>
+                🔑 Pending Registration Requests
+              </h2>
+              <div style={{ backgroundColor: '#ffffff', padding: '30px', borderRadius: '24px', boxShadow: '0 15px 40px rgba(0,0,0,0.03)' }}>
+                {pendingUsers.length === 0 ? (
+                  <p style={{ color: '#6B8272', margin: 0, fontWeight: '600' }}>🎉 No pending registration requests at the moment.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    {pendingUsers.map((pUser, index) => (
+                      <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFDF0', padding: '16px 24px', borderRadius: '16px', border: '1px solid #FFD600' }}>
+                        <div>
+                          <div style={{ fontWeight: '700', color: '#004D26', fontSize: '16px' }}>{pUser.name}</div>
+                          <div style={{ fontSize: '13px', color: '#556B5C' }}>{pUser.email}</div>
                         </div>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button onClick={() => handleApproval(pUser.email, 'APPROVED')} style={{ backgroundColor: '#00E676', color: '#FFFFFF', border: 'none', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: '700' }}>✅ Approve</button>
+                          <button onClick={() => handleDeleteUser(pUser.email, true)} style={{ backgroundColor: '#FF3333', color: '#FFFFFF', border: 'none', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: '700' }}>🗑️ Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
-                        {/* TOMBOL DELETE HANYA UNTUK AKUN SELAIN UTAMA SUPER_ADMIN */}
-                        {admin.email !== "julio@gmail.com" && (
+            {/* ACTIVE CONTROLLERS LIST + TOMBOL EDIT & DELETE */}
+            <div>
+              <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#004D26', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: '700' }}>
+                👥 Active System Controllers (Admin List)
+              </h2>
+              <div style={{ backgroundColor: '#ffffff', padding: '30px', borderRadius: '24px', boxShadow: '0 15px 40px rgba(0,0,0,0.03)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+                  {adminData.map((admin, index) => (
+                    <div key={index} style={{ backgroundColor: '#F0FFF4', padding: '16px 24px', borderRadius: '18px', border: '2px solid #00E676', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: '340px', flex: '1 1 calc(33.333% - 20px)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '24px' }}>👤</span>
+                        <div>
+                          <div style={{ fontWeight: '700', color: '#004D26' }}>{admin.name}</div>
+                          <div style={{ fontSize: '13px', color: '#556B5C' }}>{admin.email}</div>
+                        </div>
+                      </div>
+
+                      {admin.email !== "julio@gmail.com" && (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button 
+                            onClick={() => handleStartEdit(admin)} 
+                            style={{ backgroundColor: '#FF9900', color: '#FFFFFF', border: 'none', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' }}
+                          >
+                            ✏️ Edit
+                          </button>
                           <button 
                             onClick={() => handleDeleteUser(admin.email, false)} 
                             style={{ backgroundColor: '#FF3333', color: '#FFFFFF', border: 'none', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' }}
                           >
                             🗑️ Delete
                           </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
+            </div>
             
           </div>
         )}
