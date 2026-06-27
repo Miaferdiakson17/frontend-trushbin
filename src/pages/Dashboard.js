@@ -309,7 +309,7 @@ function Dashboard() {
         {/* VIEW 1: MONITORING REAL-TIME */}
         {activeMenu === 'monitoring' && (
           <div>
-            <h2 style={{ fontSize: '22px', marginBottom: '25px', color: '#004D26', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: '700' }}>📊 Real-Time Bin Capacity Status</h2>
+            <h2 style={{ fontSize: '22px', marginBottom: '25px', color: '#004D26', fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: '700' }}>📊 Real-Time Bin ferdi Status</h2>
             <div style={{ display: 'flex', gap: '30px', marginBottom: '35px', flexWrap: 'wrap' }}>
               {/* ORGANIK */}
               <div style={{ backgroundColor: '#ffffff', padding: '30px', borderRadius: '24px', flex: 1, minWidth: '320px', boxShadow: '0 15px 40px rgba(0, 0, 0, 0.03)', borderTop: '6px solid #00FF66', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
