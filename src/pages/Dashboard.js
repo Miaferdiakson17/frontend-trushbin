@@ -207,11 +207,17 @@ function Dashboard() {
   // =====================================================
   // FUNGSI LOGOUT & DELETE DATA SAMPAH
   // =====================================================
-  const handleLogout = () => {
-    localStorage.clear(); 
-    alert("Logout successful!");
-    window.location.href = "/";
-  };
+ const handleLogout = () => {
+  const confirmLogout = window.confirm(
+    "Are you sure you want to logout from the Smart Trash Bin Management System?"
+  );
+
+  if (!confirmLogout) return;
+
+  localStorage.clear();
+  alert("Logout successful!");
+  window.location.href = "/";
+};
 
   const handleDeleteSingle = async (id) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this trash record?");
